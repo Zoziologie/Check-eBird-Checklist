@@ -1,0 +1,7 @@
+project:
+  type: website
+  title: "Check eBird Checklist"
+  output-dir: docs
+
+editor: visual
+

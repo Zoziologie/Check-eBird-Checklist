@@ -2,6 +2,9 @@
 title: "Check eBird Checklist"
 format: html
 editor: visual
+date: 2023-10-22
+date-format: short
+author: Raphaël Nussbaumer
 ---
 
 ```{r setup, message = FALSE}
@@ -57,7 +60,7 @@ Downloading the EBD requires to [submit a data request](https://ebird.org/data/r
 :::
 
 ```{r}
-file <- "data/ebd_KE_relAug-2022/ebd_KE_relAug-2022.txt"
+# file <- "data/ebd_KE_relAug-2022/ebd_KE_relAug-2022.txt"
 # file <- "data/ebd_US-AL-101_202204_202204_relApr-2022_SAMPLE/ebd_US-AL-101_202204_202204_relApr-2022.txt"
 file <- "data/ebd_CH_smp_relAug-2023/ebd_CH_smp_relAug-2023.txt"
 ```
@@ -71,7 +74,7 @@ obs_0 <- read_ebd(file)
 ::: callout-tip
 In case this operation takes too much time, an alternative is to split the database on region/subregion or year.
 
-```{r, run=FALSE}
+```{r, eval = FALSE}
 obs_0 <- auk_ebd(file) %>% 
   # auk_country("Kenya") %>% 
   # auk_state("KE-300") %>% 
@@ -81,6 +84,7 @@ obs_0 <- auk_ebd(file) %>%
   # auk_complete() %>%  # Only complete checklists
   auk_filter(file = tempfile()) %>% 
   read_ebd()
+
 ```
 
 To find a country, state or county, use the [Explore regions](https://ebird.org/explore) search on eBird and use the code in the URL. Alternatively, you can also use the variable `ebird_states` in the auk package to list all countries and states.
@@ -243,12 +247,12 @@ chk <- c %>%
       (time_observations_started + minutes(duration_minutes) < hm("6:00")) & 
       number_species > 10,
     chk_midnight = time_observations_started == hms("00:00:00"),
-    chk_high_number_species = number_species>100,
+    chk_high_number_species = number_species>90,
     chk_only_one_species = all_species_reported & number_species==1 & duration_minutes > 5,
     chk_same_count_all_species = all_species_reported & median_count>0 & number_distinct_count==1 & number_species>2,
     chk_too_long_distance = effort_distance_km > 25,
     chk_multi_day = time_observations_started + minutes(duration_minutes) > hours(24),
-    chk_too_many_observers = number_observers > 20,
+    chk_too_many_observers = number_observers > 30,
     chk_too_short_duration = all_species_reported & number_species/duration_minutes > 10,
     chk_too_fast = effort_distance_km/duration_minutes*60 > 60,
     chk_complete_media = all_species_reported & number_media==number_species,
@@ -256,7 +260,8 @@ chk <- c %>%
     chk_specialized_protocol = !(protocol_type %in% c("Historical", "Traveling", "Incidental", "Stationary")),
     chk_not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03
   ) %>% 
-    mutate(across(starts_with("chk_"), ~replace_na(., FALSE)))
+  mutate(across(starts_with("chk_"), ~replace_na(., FALSE)))
+
 ```
 
 ### Check overview
@@ -296,14 +301,17 @@ as.data.frame(as.table(co_occurrence_matrix)) %>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
-For each check (edit the check name in the code below), you can also view the checklists flagged by observer.
+For each check (edit the check name in the code below), you can also view the checklists flagged by eobserver.
 
 ```{r}
 chk %>% 
-  filter(chk_too_fast) %>% 
+  filter(chk_too_long_distance) %>% 
+  # filter(rowSums(select(., starts_with("chk_"))) > 0) %>% 
+  # filter(observer_id=="obsr497615") %>% 
   group_by(observer_id) %>% 
+  arrange(desc(effort_distance_km)) %>% 
   summarise(checklist_link = toString(checklist_link), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
+  # arrange(desc(number_checklist)) %>% 
   datatable(escape = FALSE)
 ```
 
@@ -323,368 +331,132 @@ Below we provide suggested text for emailing users tailored for each check.
 The objectives of emailing users is to (1) make them aware of this error and avoid them reproducing such errors in the future and (2) get them to correct their checklist.
 :::
 
-### AM/PM & midnight
-
 ```{r}
-template <- "
+template <- list(
+  a ="
 Dear [name],
 
 Thank you for being a part of eBird. To help make sure that eBird can be used for scientific research and conservation, volunteers like me follow up on unusual observations as a part of the eBird data quality process.
-
+",
+  checklist = "
 I am writing about the following checklist(s): {checklists_link}
-
-In particular, there seems to be an issue with the start time of your checklist. Would you mind verifying your checklist?
-
-Potential issues can be a confusion between AM/PM or a wrong start time. If no start time is available, the checklist protocol should be <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorHistorical\">historical</a> if birding was a <a href=\"https://support.ebird.org/en/support/solutions/articles/48000967748-birding-as-your-primary-purpose-and-complete-checklists\">primary purpose</a> or <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorIncidental\">incidental</a> if birding was not your primary purpose. In both cases, you can leave the time field empty. 
-
-Could you please let me know if the time was originally correct, or if you have now corrected it, so that I can set the checklist as public again? 
+",
+  z = "
+Could you please check these checklists, and make any potential corrections. Let me know when you're done, so that I can set the checklist as public again.
 
 Thanks in advance,
 
 Raphaël Nussbaumer
-"
-
-email <- chk %>% 
-  filter(chk_ampm | chk_midnight) %>% 
-  group_by(observer_id) %>%
-  summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
-  glue_data(template, .sep = "\n----\n",)
-
-fileConn<-file("email/ampm_midnight.txt")
-writeLines(email, fileConn)
-close(fileConn)
-```
-
-### High number of species
-
-```{r}
-
-template <- "
-Dear [name],
-
-Thank you for being a part of eBird. To help make sure that eBird can be used for scientific research and conservation, volunteers like me follow up on unusual observations as a part of the eBird data quality process.
-
-I am writing about the following checklists(s): {checklists_link}
-
-Your checklist(s) was flagged because they contain an unusually high number of species. We want to double check with you that the checklist follows <a href=\"https://support.ebird.org/en/support/solutions/articles/48000795623-ebird-rules-and-best-practices\">eBird rules and best practices</a>, in particular:
+",
+  ampm = "
+Your checklist(s) was flagged because it has an unusual start time, with a potential confusion between AM and PM. If no start time is available, the checklist protocol should be <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorHistorical\">historical</a> if birding was your <a href=\"https://support.ebird.org/en/support/solutions/articles/48000967748-birding-as-your-primary-purpose-and-complete-checklists\">primary purpose</a> or <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorIncidental\">incidental</a> if birding was not your primary purpose. In both cases, you can leave the time field empty. 
+",
+  ampm_midnight = "
+Your checklist(s) was flagged because it is unusual to start a checklist at exactly midnight. If no start time is available, the checklist protocol should be <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorHistorical\">historical</a> if birding was your <a href=\"https://support.ebird.org/en/support/solutions/articles/48000967748-birding-as-your-primary-purpose-and-complete-checklists\">primary purpose</a> or <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorIncidental\">incidental</a> if birding was not your primary purpose. In both cases, you can leave the time field empty. 
+",
+high_number_species = "
+Your checklist(s) was flagged because it contains an unusually high number of species. We want to double check with you that the checklist follows <a href=\"https://support.ebird.org/en/support/solutions/articles/48000795623-ebird-rules-and-best-practices\">eBird rules and best practices</a>, in particular:
 - Correspond to a single calendar date: checklists should not span multiple
 days. <b>Were all species seen/heard from the start time of your checklist up to the duration set in your checklist?</b>
 - Correspond to a single map location: birds from different map regions should not be combined on one list. <b>Were all species reported seen/heard within the distance set in your checklist, centered around the location of the checklist?</b> 
 - Correspond to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols\">appropriate protocol</a>.
-
-Could you please make the relevant corrections so that the checklist follows these guidelines, and let me know when done, so that I can set the checklist as public again?
-
-Thanks in advance,
-
-Raphaël Nussbaumer
-"
-
-email <- chk %>% 
-  filter(chk_high_number_species) %>% 
-  group_by(observer_id) %>%
-  summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
-  glue_data(template, .sep = "\n----\n",)
-
-fileConn<-file("email/high_number_species.txt")
-writeLines(email, fileConn)
-close(fileConn)
-```
-
-### Long distance
-
-```{r}
-
-template <- "
-Dear [name],
-
-Thank you for being a part of eBird. To help make sure that eBird can be used for scientific research and conservation, volunteers like me follow up on unusual observations as a part of the eBird data quality process.
-
-I am writing about the following checklist(s): {checklists_link}
-
-Your checklist(s) was flagged because it as an usually high distance. While it is acceptable to make a checklist of up to 80km according to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000795623-ebird-rules-and-best-practices\">eBird rules and best practices</a>, more precise checklists are more valuable for science. It is therefore recommend to keep Traveling checklists under 5 miles (8 km) and Stationary checklists under 3 hours for your sightings to make the biggest impact for science. Limiting your checklists to less than one hour or one mile provides even more checklist precision! 
-
-Please do not submit one checklist spanning several locations, especially when those locations were separated by long drives in between. A good rule of thumb is: every time you get in a car, stop the previous list and start a new list at the next location.
-
-In light of the above, could you please check that the location, duration, distance and protocol of your checklist are correct, and let me know when done, so that I can set the checklist as public again?
-
-Thanks in advance,
-
-Raphaël Nussbaumer
-"
-
-email <- chk %>% 
-  filter(chk_too_long_distance) %>% 
-  group_by(observer_id) %>%
-  summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
-  glue_data(template, .sep = "\n----\n",)
-
-fileConn<-file("email/too_long_distance.txt")
-writeLines(email, fileConn)
-close(fileConn)
-```
-
-### Multi-day
-
-```{r}
-
-template <- "
-Dear [name],
-
-Thank you for being a part of eBird. To help make sure that eBird can be used for scientific research and conservation, volunteers like me follow up on unusual observations as a part of the eBird data quality process.
-
-I am writing about the following checklist(s): {checklists_link}
-
-Your checklist(s) was flagged because of its unusually high duration. According to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000795623-ebird-rules-and-best-practices\">eBird rules and best practices</a>, checklists should <b>correspond to a single calendar date and should not span multiple days.</b>
-
-Could you please make the appropriate correction and let me know when done, so that I can set the checklist as public again?
-
-Thanks in advance,
-
-Raphaël Nussbaumer
-"
-
-email <- chk %>% 
-  filter(chk_multi_day) %>% 
-  group_by(observer_id) %>%
-  summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
-  glue_data(template, .sep = "\n----\n",)
-
-fileConn<-file("email/multi_day.txt")
-writeLines(email, fileConn)
-close(fileConn)
-```
-
-### Single species
-
-```{r}
-
-template <- "
-Dear [name],
-
-Thank you for being a part of eBird. To help make sure that eBird can be used for scientific research and conservation, volunteers like me follow up on unusual observations as a part of the eBird data quality process.
-
-I am writing about the following checklist(s): {checklists_link}
-
-Your checklist(s) was flagged because it is a complete checklist with only a single species. While this might be correct, we wanted to double check with you that birding was indeed your primary purpose and you recorded all the birds around you to the best of your abilities. (Please refer to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000967748-birding-as-your-primary-purpose-and-complete-checklistss\">eBird support help page</a> for more information).
-
-If not, you can change the protocol to 'Incidental' or mark your list as 'Incomplete'.
-
-Could you please let me know when you have made the appropriate correction so I can set the checklist as public again?
-
-Thanks in advance,
-
-Raphaël Nussbaumer
-"
-
-email <- chk %>% 
-  filter(chk_only_one_species) %>% 
-  group_by(observer_id) %>%
-  summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
-  glue_data(template, .sep = "\n----\n",)
-
-fileConn<-file("email/only_one_species.txt")
-writeLines(email, fileConn)
-close(fileConn)
-```
-
-### Same species as media
-
-```{r}
-
-template <- "
-Dear [name],
-
-Thank you for being a part of eBird. To help make sure that eBird can be used for scientific research and conservation, volunteers like me follow up on unusual observations as a part of the eBird data quality process.
-
-I am writing about the following checklist(s): {checklists_link}
-
-Your checklist(s) was flagged because it is a complete checklist and we suspect that not all birds wwere reported. While this might be correct, we wanted to double check whether birding was indeed your primary purpose and that you have recorded all the birds around you to the best of your abilities. (Please refer to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000967748-birding-as-your-primary-purpose-and-complete-checklistss\">eBird support help page</a> for more information).
-
-If not, you can change the protocol to 'Incidental' or mark your list as 'Incomplete'. 
-
-Could you please let me know when you have made the appropriate correction so I can set the checklist as public again?
-
-Thanks in advance,
-
-Raphaël Nussbaumer
-"
-
-email <- chk %>% 
-  filter(chk_complete_media) %>% 
-  group_by(observer_id) %>%
-  summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
-  glue_data(template, .sep = "\n----\n",)
-
-fileConn<-file("email/complete_media.txt")
-writeLines(email, fileConn)
-close(fileConn)
-```
-
-### Same count all species
-
-```{r}
-
-template <- "
-Dear [name],
-
-Thank you for being a part of eBird. To help make sure that eBird can be used for scientific research and conservation, volunteers like me follow up on unusual observations as a part of the eBird data quality process.
-
-I am writing about the following checklist(s): {checklists_link}
-
-Your checklist(s) was flagged because all species were recorded with the same count. We wanted to double check with you that these counts are indeed correct (see more on <a href=\"https://support.ebird.org/en/support/solutions/articles/48000838845\">how to count birds with eBird</a>).
-
-If you did not count the birds, you can udpate the count to \"X\".
-
-Could you please let me know when you have made the appropriate correction so I can set the checklist as public again?
-
-Thanks in advance, 
-
-Raphaël Nussbaumer
-"
-
-email <- chk %>% 
-  filter(chk_same_count_all_species) %>% 
-  group_by(observer_id) %>%
-  summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
-  glue_data(template, .sep = "\n----\n",)
-
-fileConn<-file("email/same_count_all_species.txt")
-writeLines(email, fileConn)
-close(fileConn)
-```
-
-### Not traveling
-
-```{r}
-
-template <- "
-Dear [name],
-
-Thank you for being a part of eBird. To help make sure that eBird can be used for scientific research and conservation, volunteers like me follow up on unusual observations as a part of the eBird data quality process.
-
-I am writing about the following checklist(s): {checklists_link}
-
-Your checklist(s) was flagged because it has a Traveling protocol with a distance smaller than 30m. According to <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorTraveling\">the guide to eBird protocols</a>, checklists with a distance smaller than 30m should be set as Stationary. 
-
-Can you check that the distance is not a typo (e.g, 0.01 instead of 0.1) or change the protocol to Stationary?
-
-Please let me know when you have made the appropriate correction so I can set the checklist as public again.
-
-Thanks in advance, 
-
-Raphaël Nussbaumer
-"
-
-email <- chk %>% 
-  filter(chk_not_traveling) %>% 
-  group_by(observer_id) %>%
-  summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
-  glue_data(template, .sep = "\n----\n",)
-
-fileConn<-file("email/traveling.txt")
-writeLines(email, fileConn)
-close(fileConn)
-```
-
-### Not stationary
-
-```{r}
-
-template <- "
-Dear [name],
-
-Thank you for being a part of eBird. To help make sure that eBird can be used for scientific research and conservation, volunteers like me follow up on unusual observations as a part of the eBird data quality process.
-
-I am writing about the following checklist(s): {checklists_link}
-
-Your checklist(s) was flagged because we suspect that the Stationary protocol is incorrectly used. Can you check the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorStationary\">guide to eBird protocol</a> and adjust the protocol as necessary? If you're unable to estimate the distance covered, the Historical protocol might be the most adapted. 
-
-Could you please let me know when you have made the appropriate correction so I can set the checklist as public again?
-
-Thanks in advance, 
-
-Raphaël Nussbaumer
-"
-
-email <- chk %>% 
-  filter(chk_not_stationary) %>% 
-  group_by(observer_id) %>%
-  summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
-  glue_data(template, .sep = "\n----\n",)
-
-fileConn<-file("email/high_not_stationary.txt")
-writeLines(email, fileConn)
-close(fileConn)
-```
-
-### Too short duration
-
-```{r}
-template <- "
-Dear [name],
-
-Thank you for being a part of eBird. To help make sure that eBird can be used for scientific research and conservation, volunteers like me follow up on unusual observations as a part of the eBird data quality process.
-
-I am writing about the following checklist(s): {checklists_link}
-
+",
+too_long_distance = "
+Your checklist(s) was flagged because it as an usually high distance. While it is acceptable to make a checklist of up to 80km according to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000795623-ebird-rules-and-best-practices\">eBird rules and best practices</a>, more precise checklists are more valuable for science. It is therefore recommended to keep Traveling checklists under 8 km and Stationary checklists under 3 hours for your sightings to make the biggest impact for science. Limiting your checklists to less than one hour or 1.5 km provides even more checklist precision! Please do not submit one checklist spanning several locations, especially when those locations were separated by long drives. A good rule of thumb is: every time you get in a car, stop the previous list and start a new list at the next location.
+",
+only_one_species = "
+Your checklist(s) was flagged because it is a complete checklist with only a single species. While this might be correct, we wanted to double check with you that birding was indeed your primary purpose and you recorded all the birds around you to the best of your abilities. (Please refer to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000967748-birding-as-your-primary-purpose-and-complete-checklistss\">eBird support help page</a> for more information). If not, you can change the protocol to 'Incidental' or mark your list as 'Incomplete'.
+",
+multi_day = "
+Your checklist(s) was flagged because of its unusually high duration. According to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000795623-ebird-rules-and-best-practices\">eBird rules and best practices</a>, checklists should <b>correspond to a single calendar date and should not span multiple days</b>.
+",
+complete_media = "
+Your checklist(s) was flagged because it is a complete checklist and we suspect that not all birds were reported. While this might be correct, we wanted to double check whether birding was indeed your primary purpose and that you have recorded all the birds around you to the best of your abilities. (Please refer to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000967748-birding-as-your-primary-purpose-and-complete-checklistss\">eBird support help page</a> for more information). If not, you can change the protocol to 'Incidental' or mark your list as 'Incomplete'. 
+",
+same_count_all_species = "
+Your checklist(s) was flagged because all species were recorded with the same count. We wanted to double check with you that these counts are indeed correct (see more on <a href=\"https://support.ebird.org/en/support/solutions/articles/48000838845\">how to count birds with eBird</a>). If you did not count the birds, you can udpate the count to \"X\".
+",
+not_stationary = "
+Your checklist(s) was flagged because we suspect that the stationary protocol might not be adequate. Can you check the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorStationary\">guide to eBird protocol</a> and adjust the protocol if necessary? If you're unable to estimate the distance covered, the Historical protocol would be a good choice. 
+",
+not_traveling = "
+Your checklist(s) was flagged because it has a traveling protocol with a distance smaller than 30m. According to <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorTraveling\">the guide to eBird protocols</a>, checklists with a distance smaller than 30m should be set as Stationary.
+",
+too_fast = "
+Your checklist(s) was flagged because we suspect a potential issue with the distance and duration entered. Could you double check the values entered and verify the validity of the protocol selected according to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000795623-ebird-rules-and-best-practices\">eBird rules and best practices</a>?
+",
+too_short_duration = "
 Your checklist(s) was flagged because we suspect a potential issue with the duration entered. Could you double check the value entered and verify the validity of the protocol selected according to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000795623-ebird-rules-and-best-practices\">eBird rules and best practices</a>?
-
-Please let me know when you have made the appropriate correction so I can set the checklist as public again.
-
-Thanks in advance, 
-
-Raphaël Nussbaumer
-"
-
-email <- chk %>% 
-  filter(chk_too_short_duration) %>% 
-  group_by(observer_id) %>%
-  summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
-  glue_data(template, .sep = "\n----\n",)
-
-fileConn<-file("email/too_short_duration.txt")
-writeLines(email, fileConn)
-close(fileConn)
+",
+too_many_observers = "
+Your checklist(s) was flagged because of the high number of observers. Maybe there is an error in this number?
+",
+specialized_protocol = "
+Your checklist(s) was flagged because it uses a specialized protocol. Please make sure the use of the protocol is appropriate according to <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorSpecialized\">eBird guide to protocols</a>."
+)
 ```
 
-### Too fast
+### Email per check
 
 ```{r}
+chk_names <- chk %>% select(starts_with("chk_")) %>% names()
 
-template <- "
-Dear [name],
-
-Thank you for being a part of eBird. To help make sure that eBird can be used for scientific research and conservation, volunteers like me follow up on unusual observations as a part of the eBird data quality process.
-
-I am writing about the following checklist(s): {checklists_link}
-
-Your checklist(s) was flagged because we suspect a potential issue with distance and duration entered. Could you double check the values entered and verify the validity of the protocol selected according to the <a href=\"https://support.ebird.org/en/support/solutions/articles/48000795623-ebird-rules-and-best-practices\">eBird rules and best practices</a>?
-
-Please let me know when you have made the appropriate correction so I can set the checklist as public again.
-
-Thanks in advance, 
-
-Raphaël Nussbaumer
-"
-
-email <- chk %>% 
-  filter(chk_too_fast) %>% 
+for (chk_i in chk_names){
+  email <- chk %>% 
+  filter(!!sym(chk_i)) %>% 
   group_by(observer_id) %>%
-  summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
-  arrange(desc(number_checklist)) %>% 
-  glue_data(template, .sep = "\n----\n",)
+    summarise(checklists_link = paste(checklist_link, collapse = ", "), number_checklist = n()) %>% 
+    arrange(desc(number_checklist)) %>% 
+    glue_data(paste0(template$a, template$checklist, template[[gsub("chk_", "",chk_i)]], template$z), .sep = "\n----\n")
+  
+  fileConn<-file(paste0("email/", gsub("chk_", "",chk_i), ".txt"))
+  writeLines(email, fileConn)
+  close(fileConn)
+}
+```
 
-fileConn<-file("email/too_fast.txt")
-writeLines(email, fileConn)
-close(fileConn)
+### Combined
+
+```{r}
+observer <- chk_combined <- chk %>% 
+  filter(rowSums(select(., starts_with("chk_"))) > 0) %>% 
+  group_by(observer_id) %>%
+  arrange(desc(n())) %>% 
+  pull(observer_id) %>% 
+  unique()
+
+email <- ""
+
+chk_names <- chk %>% select(starts_with("chk_"), -c(chk_midnight, chk_ampm) ) %>% names()
+
+for (obs_i in observer){
+  chk_obs <- chk %>% 
+    filter(observer_id == obs_i)
+  
+  email <- paste0(email, template$a , "We performed some automatic checks and the following checklists were identified as having potential issues with protocols. We detail below for each of them what might be incorrect and how to fix them.
+\n")
+  
+  for (chk_i in chk_names){
+    checklist_link <- chk_obs %>% 
+    filter(!!sym(chk_i)) %>% 
+      pull(checklist_link) %>% 
+      paste(collapse = ", ")
+    
+    if (checklist_link != ""){
+      email <- paste0(email, 
+                      "<b>", gsub("\\b([a-z])", "\\U\\1", gsub("_", " ", gsub("chk_", "",chk_i)), perl=TRUE) , "</b>: ",
+                      checklist_link, 
+                      template[[gsub("chk_", "",chk_i)]],
+                      "\n")
+      
+    }
+  }
+  email <- paste0(email, "\nBest wishes,\n----\n")
+}
+
+
+
+fileConn<-file(paste0("email/combined_per_observer.txt"))
+  writeLines(email, fileConn)
+  close(fileConn)
 ```

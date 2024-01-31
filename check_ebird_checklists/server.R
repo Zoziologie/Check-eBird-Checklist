@@ -17,7 +17,7 @@ server <- function(input, output) {
     if (is.null(inFile))
       return(NULL)
 
-    create_chk(inFile$datapath)
+    create_chk(inFile$datapath, input$too_many_species, input$too_many_species_stationary, input$too_long_distance, input$too_many_observers)
   })
 
   output$contents <- renderDataTable({

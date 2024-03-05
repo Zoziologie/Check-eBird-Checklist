@@ -1,4 +1,5 @@
 ui <- fluidPage(
+  tags$head(includeHTML("google-analytics.Rhtml")),
   titlePanel("Check eBird Checklists"),
   sidebarLayout(
     sidebarPanel(

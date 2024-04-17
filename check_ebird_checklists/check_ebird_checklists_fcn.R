@@ -12,7 +12,7 @@ library(writexl)
 library(glue)
 
 # Create function
-create_chk <- function(txt_file, too_many_species, too_many_species_stationary, too_long_distance, too_many_observers) {
+create_chk <- function(txt_file, hemisphere = "northern", too_many_species, too_many_species_stationary, too_long_distance, too_many_observers) {
 
   obs_0 <- read_ebd(txt_file)
 
@@ -28,7 +28,7 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
       "group_id", "checklist_id", "taxonomic_order", "common_name", "observation_count",
       "locality", "observation_date", "time_observations_started", "observer_id",
       "protocol_type", "duration_minutes", "effort_distance_km", "number_observers",
-      "all_species_reported", "has_media")) %>%
+      "all_species_reported", "has_media", "breeding_code")) %>%
     mutate(url = str_c("https://ebird.org/checklist/", str_extract(checklist_id, "[^,]+"), sep = "")) %>%
     relocate(url, .after = checklist_id)
 
@@ -55,6 +55,13 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
       all_species_reported = all_species_reported & protocol_type != "Incidental"
     )
 
+  # Define winter months based on hemisphere
+  if(tolower(hemisphere) == "southern") {
+    winter_months <- c(6, 7, 8, 9, 10, 11)  # Winter months for Southern Hemisphere
+  } else {
+    winter_months <- c(12, 1, 2, 3, 4, 5)  # Winter months for Northern Hemisphere
+  }
+
   chk <- c %>%
     mutate(
       ampm = (time_observations_started > hm("22:00") | time_observations_started < hm("4:00")) &
@@ -72,7 +79,8 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
       complete_media = all_species_reported & number_media==number_species,
       not_stationary = protocol_type == "Stationary" & number_species > too_many_species_stationary,
       specialized_protocol = !(protocol_type %in% c("Historical", "Traveling", "Incidental", "Stationary")),
-      not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03
+      not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03,
+      invalid_breeding_code = nchar("breeding_code") > 1 & month(observation_date) %in% winter_months
     )# %>%
     #mutate(across(starts_with("chk_"), ~replace_na(., FALSE)))
 

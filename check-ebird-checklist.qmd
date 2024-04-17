@@ -104,7 +104,7 @@ obs <- obs_0 %>%
     "group_id", "checklist_id", "taxonomic_order", "common_name", "observation_count",
     "locality", "observation_date", "time_observations_started", "observer_id",
     "protocol_type", "duration_minutes", "effort_distance_km", "number_observers",
-    "all_species_reported", "has_media"))
+    "all_species_reported", "has_media", "breeding_code"))
 
 # Build checklist database
 c <- obs %>%
@@ -240,6 +240,8 @@ It is essential that you manually adapt the value of the parameters used here to
 
 -   `chk_specialized_protocol` (*Protocol Error*): You might want to check the use of non-standard protocols.
 
+-   `chk_invalid_breeding_code` (*Breeding Code*): You might want to check these out of Northern Hemisphere breeding codes.
+
 ```{r}
 chk <- c %>% 
   mutate(
@@ -258,7 +260,8 @@ chk <- c %>%
     chk_complete_media = all_species_reported & number_media==number_species,
     chk_not_stationary = protocol_type == "Stationary" & number_species>50,
     chk_specialized_protocol = !(protocol_type %in% c("Historical", "Traveling", "Incidental", "Stationary")),
-    chk_not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03
+    chk_not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03,
+    chk_invalid_breeding_code = nchar("breeding_code") > 1 & month(observation_date) %in% c(9, 10, 11, 12, 1, 2)
   ) %>% 
   mutate(across(starts_with("chk_"), ~replace_na(., FALSE)))
 

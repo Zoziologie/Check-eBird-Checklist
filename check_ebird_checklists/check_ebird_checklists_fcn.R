@@ -28,7 +28,7 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
       "group_id", "checklist_id", "taxonomic_order", "common_name", "observation_count",
       "locality", "observation_date", "time_observations_started", "observer_id",
       "protocol_type", "duration_minutes", "effort_distance_km", "number_observers",
-      "all_species_reported", "has_media")) %>%
+      "all_species_reported", "has_media", "breeding_code")) %>%
     mutate(url = str_c("https://ebird.org/checklist/", str_extract(checklist_id, "[^,]+"), sep = "")) %>%
     relocate(url, .after = checklist_id)
 
@@ -72,7 +72,8 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
       complete_media = all_species_reported & number_media==number_species,
       not_stationary = protocol_type == "Stationary" & number_species > too_many_species_stationary,
       specialized_protocol = !(protocol_type %in% c("Historical", "Traveling", "Incidental", "Stationary")),
-      not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03
+      not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03,
+      invalid_breeding_code = nchar("breeding_code") > 1 & month(observation_date) %in% c(9, 10, 11, 12, 1, 2)
     )# %>%
     #mutate(across(starts_with("chk_"), ~replace_na(., FALSE)))
 

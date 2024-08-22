@@ -10,9 +10,12 @@ library(DT)
 library(ggplot2)
 library(writexl)
 library(glue)
+library(sf)
+
+continents_buffer <- readRDS("continents_buffer.rds")
 
 # Create function
-create_chk <- function(txt_file, too_many_species, too_many_species_stationary, too_long_distance, too_many_observers) {
+create_chk <- function(txt_file, too_many_species, too_many_species_stationary, too_long_land, too_many_observers, too_long_offshore) {
 
   obs_0 <- read_ebd(txt_file)
 
@@ -28,9 +31,13 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
       "group_id", "checklist_id", "taxonomic_order", "common_name", "observation_count",
       "locality", "observation_date", "time_observations_started", "observer_id",
       "protocol_type", "duration_minutes", "effort_distance_km", "number_observers",
-      "all_species_reported", "has_media")) %>%
+      "all_species_reported", "has_media", "latitude", "longitude")) %>%
     mutate(url = str_c("https://ebird.org/checklist/", str_extract(checklist_id, "[^,]+"), sep = "")) %>%
     relocate(url, .after = checklist_id)
+
+  # coordinates <- obs %>%
+  #   distinct(checklist_id, .keep_all = TRUE) %>%
+  #   select(checklist_id, latitude, longitude)
 
   c <- obs %>%
     mutate(
@@ -43,7 +50,8 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
       median_count = median(observation_count_num, na.rm = T),
       number_media = sum(has_media)
     ) %>%
-    mutate(no_checklists = str_count(checklist_id, "S\\d+")) %>%
+    mutate(no_checklists = sapply(str_extract_all(checklist_id, "S\\d+"),
+                                  function(x) length(unique(x)))) %>%
     ungroup() %>%
     select(-c(group_id, taxonomic_order, common_name, observation_count, observation_count_num, has_media)) %>%
     unique()
@@ -73,11 +81,21 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
       not_stationary = protocol_type == "Stationary" & number_species > too_many_species_stationary,
       not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03
     ) %>%
-    mutate(too_long_distance = ifelse(protocol_type != "eBird Pelagic Protocol" & effort_distance_km > too_long_distance,
-                                      TRUE, FALSE)) %>%
     mutate(pelagic_too_long = ifelse(protocol_type == "eBird Pelagic Protocol" & duration_minutes > 75, TRUE, FALSE)) %>%
     mutate(specialized_protocol = !(protocol_type %in% c("Historical", "Traveling", "Incidental", "Stationary"))) %>%
     mutate(no_observer_mismatch = ifelse(no_checklists > number_observers, TRUE, FALSE))
+
+  chk <- st_as_sf(chk, coords = c("longitude", "latitude"), crs = 4326) %>%
+    st_transform(crs = 3857)
+
+  chk <- chk %>%
+    st_join(continents_buffer) %>%
+    mutate(too_long_distance_land = ifelse(!is.na(continent) & effort_distance_km > too_long_land,
+                                      TRUE, FALSE)) %>%
+    mutate(too_long_distance_offshore = ifelse(is.na(continent) & effort_distance_km > too_long_offshore,
+                                               TRUE, FALSE)) %>%
+    st_drop_geometry() %>%
+    select(-continent)
 
   chk <- chk %>%
     select(-c(time_observations_started, all_species_reported, number_distinct_count,

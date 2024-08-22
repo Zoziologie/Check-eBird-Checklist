@@ -1,4 +1,4 @@
-selected_checks <- c("ampm", "midnight", "high_number_species", "only_one_species", "same_count_all_species", "multi_day", "too_many_observers", "too_short_duration", "too_fast", "complete_media", "not_stationary", "not_traveling", "too_long_distance", "pelagic_too_long", "specialized_protocol", "no_observer_mismatch")
+selected_checks <- c("ampm", "midnight", "high_number_species", "only_one_species", "same_count_all_species", "multi_day", "too_many_observers", "too_short_duration", "too_fast", "complete_media", "not_stationary", "not_traveling", "pelagic_too_long", "specialized_protocol", "no_observer_mismatch", "too_long_distance_land", "too_long_distance_offshore")
 
 ui <- fluidPage(
   tags$head(includeHTML("google-analytics.Rhtml")),
@@ -11,7 +11,8 @@ ui <- fluidPage(
       numericInput('too_many_species', 'high_number_species threshold', value = 70),
       numericInput('too_many_observers', 'too_many_observers threshold', value = 20),
       numericInput('too_many_species_stationary', 'not_stationary threshold', value = 50),
-      numericInput('too_long_distance', 'too_long_distance threshold (km)', value = 20),
+      numericInput('too_long_land', 'too_long_distance_land threshold (km)', value = 20),
+      numericInput('too_long_offshore', 'too_long_distance_offshore threshold (km)', value = 50),
       hr(),
       checkboxGroupInput("vars", "Select checks to include:",
                          choices = selected_checks,  # Choices will be set in the server
@@ -40,10 +41,11 @@ ui <- fluidPage(
                   <li>complete_media: Checklists marked as complete with a media for each species often tend to rather be 'Incomplete' checklists.</li>
                   <li>not_stationary: Staionary checklists with more than <b>X</b> species could be traveling checklists.</li>
                   <li>not_traveling: Traveling checklists of less than 30 m should be entered as stationary.</li>
-                  <li>too_long_distance: A checklist of more than <b>X</b> km could be invalid based on distance covered. This does not apply to checklists with the pelagic protocol.</li>
                   <li>pelagic_too_long: Checklists with the pelagic protocol are flagged if they are longer than 75 minutes.</li>
                   <li>specialized_protocol: You might want to check the use of non-standard protocols.</li>
-                  <li>no_observer_mismatch: Flagged when a checklist is shared with a larger number of people than the indicated number of observers.</li><br><br>
+                  <li>no_observer_mismatch: Flagged when a checklist is shared with a larger number of people than the indicated number of observers.</li>
+                  <li>too_long_distance_land: A checklist of more than <b>X</b> km could be invalid based on distance covered. This check is only run on checklists from land or less than 2 miles offshore.</li>
+                  <li>too_long_distance_offshore: Offshore checklists (more than 2 miles from land) over <b>X</b> km might be invalid based on distance covered. The acceptable distance for an offshore list can be longer than that for an onshore list.</li><br><br>
                    Code by Raphaël Nussbaumer and Linus Blomqvist (<a href = 'https://github.com/Zoziologie/Check-eBird-Checklist'>here)</a>. Web app by Linus Blomqvist. <br>
                    This app is a work in progress. For questions or suggestions please contact linus [dot] blomqvist [at] gmail [dot] com.<p>")
   )

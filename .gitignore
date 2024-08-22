@@ -57,3 +57,6 @@ check-ebird-checklist_files/*
 # csv, txt files
 *.csv
 *.txt
+
+# land polygons
+check_ebird_checklists/land-polygons-complete-4326/

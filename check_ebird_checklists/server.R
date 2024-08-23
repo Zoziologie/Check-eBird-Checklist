@@ -21,7 +21,12 @@ server <- function(input, output) {
       select(url:number_species, all_of(input$vars)) %>%
       mutate(dubious = apply(.[, 10:ncol(.)], 1, any)) %>%
       filter(dubious == TRUE) %>%
-      select(-dubious)
+      select(-dubious) %>%
+      rowwise() %>%
+      mutate(flags = paste(names(select(., where(is.logical)))[which(c_across(where(is.logical)))], collapse = ", ")) %>%
+      ungroup() %>%
+      relocate(flags, .after = url) %>%
+      select(url:number_species)
   })
 
   output$contents <- renderDataTable({

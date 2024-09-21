@@ -32,7 +32,7 @@ ui <- fluidPage(
               HTML("<p><li>ampm: A frequent issue is for the time to be entered as AM instead of PM (i.e., in the middle of the night, rather than in the afternoon).</li>
                   <li>midnight: Starting a checklist at midnight should be quite uncommon, but it's often used to enter day-list or incorrectly add time on a historical/incidental list without time.</li>
                   <li>high_number_species: Checklists with an exceptionally high number of species (<b>X</b>, relative to your region) are generally indicative of multi-day lists or list-building.</li>
-                  <li>only_one_species: A complete checklist with a single species is often indicative of incorrectly checking the 'Complete' button.</li>
+                  <li>only_one_species: A complete checklist with a single species is often indicative of incorrectly checking the 'Complete' button. Nocturnal checklists are not flagged, as it is quite common to only have one species when owling.</li>
                   <li>same_count_all_species: Most commonly occurs when the number of individuals for every species is 1, in which case it is possible that the correct selection should be X to mark presence.</li>
                   <li>multi_day: Checklists that span over two days are not valid.</li>
                   <li>too_many_observers: Checklists with more than <b>X</b> people could represent multi-party effort or some other issue.</li>

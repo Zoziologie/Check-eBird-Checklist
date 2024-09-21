@@ -19,7 +19,7 @@ server <- function(input, output) {
 
     create_chk(inFile$datapath, input$too_many_species, input$too_many_species_stationary, input$too_long_land, input$too_many_observers, input$too_long_offshore) %>%
       select(url:number_species, all_of(input$vars)) %>%
-      mutate(dubious = apply(.[, 10:ncol(.)], 1, any)) %>%
+      mutate(dubious = apply(.[, all_of(input$vars)], 1, any)) %>%
       filter(dubious == TRUE) %>%
       select(-dubious) %>%
       rowwise() %>%

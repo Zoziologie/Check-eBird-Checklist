@@ -130,7 +130,8 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
       too_fast = effort_distance_km/duration_minutes*60 > 60,
       complete_media = nocturnal == FALSE & all_species_reported & number_media == number_species,
       not_stationary = protocol_type == "Stationary" & number_species > too_many_species_stationary,
-      not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03
+      not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03,
+      incidental_complete = protocol_type=="Incidental" & all_species_reported
     ) %>%
     mutate(pelagic_too_long = ifelse(protocol_type == "eBird Pelagic Protocol" & duration_minutes > 75, TRUE, FALSE)) %>%
     mutate(specialized_protocol = !(protocol_type %in% c("Historical", "Traveling", "Incidental", "Stationary"))) %>%

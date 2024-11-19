@@ -142,8 +142,9 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
 
   chk <- chk %>%
     select(url, locality:time_observations_started, protocol_type, duration_minutes,
-           effort_distance_km, number_observers, number_species,
-           ampm:too_long_distance_offshore)
+           effort_distance_km, number_observers, number_species, observer_id,
+           ampm:too_long_distance_offshore) %>%
+    distinct()
 
   return(chk)
 }

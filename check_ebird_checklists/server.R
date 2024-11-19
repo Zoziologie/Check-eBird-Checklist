@@ -18,7 +18,7 @@ server <- function(input, output) {
       return(NULL)
 
     create_chk(inFile$datapath, input$too_many_species, input$too_many_species_stationary, input$too_long_land, input$too_many_observers, input$too_long_offshore) %>%
-      select(url:number_species, all_of(input$vars)) %>%
+      select(url:observer_id, all_of(input$vars)) %>%
       mutate(dubious = apply(.[, all_of(input$vars)], 1, any)) %>%
       filter(dubious == TRUE) %>%
       select(-dubious) %>%
@@ -26,7 +26,7 @@ server <- function(input, output) {
       mutate(flags = paste(names(select(., where(is.logical)))[which(c_across(where(is.logical)))], collapse = ", ")) %>%
       ungroup() %>%
       relocate(flags, .after = url) %>%
-      select(url:number_species)
+      select(url:observer_id)
   })
 
   output$contents <- renderDataTable({

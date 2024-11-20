@@ -240,6 +240,8 @@ It is essential that you manually adapt the value of the parameters used here to
 
 -   `chk_specialized_protocol` (*Protocol Error*): You might want to check the use of non-standard protocols.
 
+-   `chk_incidental_complete` (*Protocol Error*): Incidental checklists may not reflect all species.
+
 ```{r}
 chk <- c %>% 
   mutate(
@@ -258,7 +260,8 @@ chk <- c %>%
     chk_complete_media = all_species_reported & number_media==number_species,
     chk_not_stationary = protocol_type == "Stationary" & number_species>50,
     chk_specialized_protocol = !(protocol_type %in% c("Historical", "Traveling", "Incidental", "Stationary")),
-    chk_not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03
+    chk_not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03,
+    chk_incidental_complete = protocol_type=="Incidental" & all_species_reported
   ) %>% 
   mutate(across(starts_with("chk_"), ~replace_na(., FALSE)))
 
@@ -393,7 +396,10 @@ Your checklist(s) was flagged because of the high number of observers. Maybe the
 ",
 specialized_protocol = "
 Your checklist(s) was flagged because it uses a specialized protocol. Please make sure the use of the protocol is appropriate according to <a href=\"https://support.ebird.org/en/support/solutions/articles/48000950859-guide-to-ebird-protocols#anchorSpecialized\">eBird guide to protocols</a>."
-)
+),
+incidental_complete = "
+Your checklist(s) was flagged because it is marked as incidental, meaning that you weren't actively birding, but the checklist was marked as complete, meaning that all birds in the area were counted. Are you sure that you logged all species at the time?
+"
 ```
 
 ### Email per check

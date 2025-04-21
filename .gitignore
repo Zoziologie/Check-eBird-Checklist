@@ -59,4 +59,4 @@ check-ebird-checklist_files/*
 *.txt
 
 # land polygons
-WB_countries_Admin0_10m/
+WB_countries_Admin0_10m

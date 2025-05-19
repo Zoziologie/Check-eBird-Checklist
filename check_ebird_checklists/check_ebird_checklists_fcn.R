@@ -20,6 +20,11 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
   obs_0 <- read_ebd(txt_file) %>%
     filter(all_species_reported == TRUE)
 
+  # Normalize protocol column name
+  if ("protocol_type" %in% names(obs_0)) {
+    obs_0 <- obs_0 %>% rename(protocol_name = protocol_type)
+  }
+
   obs <- obs_0 %>%
     mutate(
       group_id = checklist_id,
@@ -28,7 +33,7 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
     select(c(
       "group_id", "checklist_id", "taxonomic_order", "common_name", "observation_count",
       "locality", "observation_date", "time_observations_started", "observer_id",
-      "protocol_type", "duration_minutes", "effort_distance_km", "number_observers",
+      "protocol_name", "duration_minutes", "effort_distance_km", "number_observers",
       "all_species_reported", "has_media", "latitude", "longitude")) %>%
     mutate(url = str_c("https://ebird.org/checklist/", str_extract(checklist_id, "[^,]+"), sep = ""))
 
@@ -55,7 +60,7 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
       time_observations_started = as_hms(time_observations_started),
       checklist_link = paste0("<a href='https://ebird.org/checklist/",
                               str_extract(checklist_id, "^[^,]+"), "' target='_blank'>", checklist_id, "</a>"),
-      all_species_reported = all_species_reported & protocol_type != "Incidental"
+      all_species_reported = all_species_reported & protocol_name != "Incidental"
     ) %>%
     mutate(time_observations_ended = as_hms(as.POSIXct(time_observations_started) + minutes(duration_minutes)))
 
@@ -129,11 +134,11 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
       too_short_duration = all_species_reported & number_species/duration_minutes > 10,
       too_fast = effort_distance_km/duration_minutes*60 > 60,
       complete_media = nocturnal == FALSE & all_species_reported & number_media == number_species,
-      not_stationary = protocol_type == "Stationary" & number_species > too_many_species_stationary,
-      not_traveling = protocol_type=="Traveling" & effort_distance_km < 0.03
+      not_stationary = protocol_name == "Stationary" & number_species > too_many_species_stationary,
+      not_traveling = protocol_name=="Traveling" & effort_distance_km < 0.03
     ) %>%
-    mutate(pelagic_too_long = ifelse(protocol_type == "eBird Pelagic Protocol" & duration_minutes > 75, TRUE, FALSE)) %>%
-    mutate(specialized_protocol = !(protocol_type %in% c("Historical", "Traveling", "Incidental", "Stationary"))) %>%
+    mutate(pelagic_too_long = ifelse(protocol_name == "eBird Pelagic Protocol" & duration_minutes > 75, TRUE, FALSE)) %>%
+    mutate(specialized_protocol = !(protocol_name %in% c("Historical", "Traveling", "Incidental", "Stationary"))) %>%
     mutate(no_observer_mismatch = ifelse(no_checklists > number_observers, TRUE, FALSE)) %>%
     mutate(too_long_distance_land = ifelse(!is.na(continent) & effort_distance_km > too_long_land,
                                            TRUE, FALSE)) %>%
@@ -141,7 +146,7 @@ create_chk <- function(txt_file, too_many_species, too_many_species_stationary, 
                                                TRUE, FALSE))
 
   chk <- chk %>%
-    select(url, locality:time_observations_started, protocol_type, duration_minutes,
+    select(url, locality:time_observations_started, protocol_name, duration_minutes,
            effort_distance_km, number_observers, number_species, observer_id,
            ampm:too_long_distance_offshore) %>%
     distinct()

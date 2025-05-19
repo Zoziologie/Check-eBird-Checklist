@@ -34,9 +34,13 @@ server <- function(input, output) {
   })
 
   output$downloadData <- downloadHandler(
-    filename = "check_ebird_checklist.csv",
+    filename = function() {
+      "check_ebird_checklist.csv"
+    },
     content = function(file) {
-      write.csv(datasetInput(), file, row.names = FALSE)
+      data <- datasetInput()
+      validate(need(!is.null(data), "No data to download"))
+      write.csv(data, file, row.names = FALSE)
     }
   )
 }

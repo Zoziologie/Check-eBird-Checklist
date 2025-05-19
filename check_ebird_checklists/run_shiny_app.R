@@ -1,5 +1,5 @@
 # Set working directory
-setwd("/Users/linusblomqvist/Library/CloudStorage/Dropbox/Birding/ebird_R/Check-eBird-Checklist/check_ebird_checklists")
+setwd("~/Documents/Check-eBird-Checklist/check_ebird_checklists")
 
 # Run app locally
 library(shiny)
